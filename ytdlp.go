@@ -1,4 +1,4 @@
-package ytdlp_wrapper
+package woo_ytdlp
 
 import (
 	"bufio"
