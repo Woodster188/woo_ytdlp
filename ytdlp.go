@@ -4,20 +4,31 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
+type YtdlpOptions struct {
+	OutFilename  string
+	VideoExt     string
+	AudioExt     string
+	VideoQuality int //480, 720, 1080 etc
+}
+
 type ytdlp struct {
-	Path string
+	Path    string
+	Options YtdlpOptions
 }
 
 type Ytdlp interface {
-	Download(ctx context.Context, link, to string, prgressCh chan string) error
+	Download(ctx context.Context, link, to string, prgressCh chan int) error
+	SetOutFilename(filename string)
+	SetQuality(quality int)
 }
 
-func (yt *ytdlp) Download(ctx context.Context, link, toDir string, progressCh chan string) error {
-	defer close(progressCh)
+func (yt *ytdlp) Download(ctx context.Context, link, toDir string, progressCh chan int) error {
 	if yt.Path == "" {
 		return errors.New("path to yt-dlp is not configured")
 	}
@@ -25,19 +36,28 @@ func (yt *ytdlp) Download(ctx context.Context, link, toDir string, progressCh ch
 		ctx,
 		yt.Path,
 	)
+	ytFiltersStr := fmt.Sprintf(
+		"bestvideo[ext=%s][height=%d]+bestaudio[ext=%s]/bestvideo+bestaudio/best",
+		yt.Options.VideoExt, yt.Options.VideoQuality, yt.Options.AudioExt,
+	)
 	cmd.Args = append(cmd.Args, link)
-	cmd.Args = append(cmd.Args, "-f", "bestvideo[ext=mp4][height=1080]+bestaudio[ext=m4a]/bestvideo+bestaudio/best")
-	cmd.Args = append(cmd.Args, "-o", "video.mp4")
+	cmd.Args = append(cmd.Args, "-f", ytFiltersStr)
+	cmd.Args = append(cmd.Args, "-o", yt.Options.OutFilename)
 	cmd.Dir = toDir
 
 	stdoutPipe, _ := cmd.StdoutPipe()
 	scanner := bufio.NewScanner(stdoutPipe)
 	scanner.Split(bufio.ScanWords)
 	go func() {
+		var progress int
 		for scanner.Scan() {
 			line := scanner.Text()
 			if strings.Contains(line, "%") {
-				progressCh <- line
+				newProgress := formatProgress(line) / 2
+				if progress != newProgress {
+					progress = newProgress
+					progressCh <- progress
+				}
 			}
 		}
 	}()
@@ -46,6 +66,27 @@ func (yt *ytdlp) Download(ctx context.Context, link, toDir string, progressCh ch
 	return err
 }
 
+func (yt *ytdlp) SetOutFilename(filename string) {
+	yt.Options.OutFilename = filename
+}
+func (yt *ytdlp) SetQuality(quality int) {
+	yt.Options.VideoQuality = quality
+}
+
+func formatProgress(prStr string) int {
+	prStr = strings.Replace(prStr, "%", "", -1)
+	var result float64
+	result, _ = strconv.ParseFloat(prStr, 64)
+	return int(result)
+
+}
+
 func NewYtdlp(path string) Ytdlp {
-	return &ytdlp{Path: path}
+	options := YtdlpOptions{
+		OutFilename:  "video.mp4",
+		VideoExt:     "mp4",
+		AudioExt:     "m4a",
+		VideoQuality: 1080,
+	}
+	return &ytdlp{Path: path, Options: options}
 }
