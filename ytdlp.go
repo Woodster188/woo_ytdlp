@@ -37,7 +37,7 @@ func (yt *ytdlp) Download(ctx context.Context, link, toDir string, progressCh ch
 		yt.Path,
 	)
 	ytFiltersStr := fmt.Sprintf(
-		"bestvideo[ext=%s][height=%d]+bestaudio[ext=%s]/bestvideo+bestaudio/best",
+		"bestvideo[ext=%s][height=%d]+bestaudio[ext=%s]/best",
 		yt.Options.VideoExt, yt.Options.VideoQuality, yt.Options.AudioExt,
 	)
 	cmd.Args = append(cmd.Args, link)
