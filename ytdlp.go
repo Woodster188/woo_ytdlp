@@ -62,7 +62,7 @@ func (yt *ytdlp) Download(ctx context.Context, link, toDir string, progressCh ch
 		}
 	}()
 	err := startWithErr(cmd)
-	err = WaitWithErr(cmd)
+	err = waitWithErr(cmd)
 	return err
 }
 
