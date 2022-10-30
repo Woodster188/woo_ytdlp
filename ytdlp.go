@@ -96,7 +96,7 @@ func startWithErr(cmd *exec.Cmd) error {
 	cmd.Stderr = &errBuf
 	err := cmd.Start()
 	if err != nil {
-		return errors.New(errBuf.String())
+		return fmt.Errorf("%s: %s", err, errBuf.String())
 	}
 	return nil
 }
@@ -106,7 +106,7 @@ func waitWithErr(cmd *exec.Cmd) error {
 	cmd.Stderr = &errBuf
 	err := cmd.Wait()
 	if err != nil {
-		return errors.New(errBuf.String())
+		return fmt.Errorf("%s: %s", err, errBuf.String())
 	}
 	return nil
 }
