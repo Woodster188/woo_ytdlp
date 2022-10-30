@@ -15,6 +15,7 @@ type YtdlpOptions struct {
 	VideoExt     string
 	AudioExt     string
 	VideoQuality int //480, 720, 1080 etc
+	ErrWithOutput   bool
 }
 
 type ytdlp struct {
@@ -26,6 +27,7 @@ type Ytdlp interface {
 	Download(ctx context.Context, link, to string, prgressCh chan int) error
 	SetOutFilename(filename string)
 	SetQuality(quality int)
+	SetErrWithOutput(mode bool)
 }
 
 func (yt *ytdlp) Download(ctx context.Context, link, toDir string, progressCh chan int) error {
@@ -48,10 +50,14 @@ func (yt *ytdlp) Download(ctx context.Context, link, toDir string, progressCh ch
 	stdoutPipe, _ := cmd.StdoutPipe()
 	scanner := bufio.NewScanner(stdoutPipe)
 	scanner.Split(bufio.ScanWords)
+	var outBuf strings.Builder
 	go func() {
 		var progress int
 		for scanner.Scan() {
 			line := scanner.Text()
+			if yt.Options.ErrWithOutput {
+				outBuf.WriteString(line)
+			}
 			if strings.Contains(line, "%") {
 				newProgress := formatProgress(line) / 2
 				if progress != newProgress {
@@ -61,8 +67,11 @@ func (yt *ytdlp) Download(ctx context.Context, link, toDir string, progressCh ch
 			}
 		}
 	}()
-	err := startWithErr(cmd)
-	err = waitWithErr(cmd)
+	err := cmd.Start()
+	err = cmd.Wait()
+	if err != nil && yt.Options.ErrWithOutput{
+		err = fmt.Errorf("%s: %s", err.Error(), outBuf.String())
+	}
 	return err
 }
 
@@ -71,6 +80,10 @@ func (yt *ytdlp) SetOutFilename(filename string) {
 }
 func (yt *ytdlp) SetQuality(quality int) {
 	yt.Options.VideoQuality = quality
+}
+
+func (yt *ytdlp) SetErrWithOutput(mode bool) {
+	yt.Options.ErrWithOutput = mode
 }
 
 func formatProgress(prStr string) int {
@@ -87,26 +100,7 @@ func NewYtdlp(path string) Ytdlp {
 		VideoExt:     "mp4",
 		AudioExt:     "m4a",
 		VideoQuality: 1080,
+		ErrWithOutput: false,
 	}
 	return &ytdlp{Path: path, Options: options}
-}
-
-func startWithErr(cmd *exec.Cmd) error {
-	var errBuf strings.Builder
-	cmd.Stderr = &errBuf
-	err := cmd.Start()
-	if err != nil {
-		return fmt.Errorf("%s: %s", err, errBuf.String())
-	}
-	return nil
-}
-
-func waitWithErr(cmd *exec.Cmd) error {
-	var errBuf strings.Builder
-	cmd.Stderr = &errBuf
-	err := cmd.Wait()
-	if err != nil {
-		return fmt.Errorf("%s: %s", err, errBuf.String())
-	}
-	return nil
 }
