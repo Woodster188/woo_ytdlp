@@ -44,7 +44,7 @@ func (yt *ytdlp) Download(ctx context.Context, link, toDir string, progressCh ch
 	cmd.Args = append(cmd.Args, "-f", ytFiltersStr)
 	cmd.Args = append(cmd.Args, "-o", yt.Options.OutFilename)
 	cmd.Dir = toDir
-
+	
 	stdoutPipe, _ := cmd.StdoutPipe()
 	scanner := bufio.NewScanner(stdoutPipe)
 	scanner.Split(bufio.ScanWords)
@@ -61,8 +61,8 @@ func (yt *ytdlp) Download(ctx context.Context, link, toDir string, progressCh ch
 			}
 		}
 	}()
-	err := cmd.Start()
-	err = cmd.Wait()
+	err := startWithErr(cmd)
+	err = WaitWithErr(cmd)
 	return err
 }
 
@@ -89,4 +89,24 @@ func NewYtdlp(path string) Ytdlp {
 		VideoQuality: 1080,
 	}
 	return &ytdlp{Path: path, Options: options}
+}
+
+func startWithErr(cmd *exec.Cmd) error {
+	var errBuf strings.Builder
+	cmd.Stderr = &errBuf
+	err := cmd.Start()
+	if err != nil {
+		return errors.New(errBuf.String())
+	}
+	return nil
+}
+
+func waitWithErr(cmd *exec.Cmd) error {
+	var errBuf strings.Builder
+	cmd.Stderr = &errBuf
+	err := cmd.Wait()
+	if err != nil {
+		return errors.New(errBuf.String())
+	}
+	return nil
 }
