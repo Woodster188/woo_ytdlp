@@ -57,6 +57,7 @@ func (yt *ytdlp) Download(ctx context.Context, link, toDir string, progressCh ch
 	scanner.Split(bufio.ScanWords)
 	var outBuf strings.Builder
 	go func() {
+		defer close(progressCh)
 		var progress int
 		for scanner.Scan() {
 			line := scanner.Text()
